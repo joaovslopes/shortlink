@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const urlSchema = new mongoose.Schema(
   {
-    name:{
+    title:{
       type: String,
       require: true,
     },
