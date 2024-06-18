@@ -1,42 +1,39 @@
-const express = require("express");
-const { connectToMongoDB } = require("./connect");
-const urlRoute = require("./routes/url");
-const URL = require("./models/url");
+const express = require('express');
+const { connectToMongoDB } = require('./connect');
+const urlRoute = require('./routes/url');
+const dbSelector = require('./middleware/dbSelector');
 
 const app = express();
 const PORT = 8001;
 
-
-connectToMongoDB("mongodb+srv://joaovslopesz:l25lD10A01Rhjofr@bancoshortlink.iptf7z8.mongodb.net/?retryWrites=true&w=majority&appName=BancoShortLink")
-  .then(() => console.log("Mongodb connected"))
-  .catch(err => console.error("Mongodb connection error:", err));
-
+connectToMongoDB().then(() =>
+  console.log('MongoDB connected')
+);
 
 app.use(express.json());
+app.use(dbSelector); // Usar o middleware para selecionar o banco de dados
 
+app.use('/url', urlRoute); // Rota para manipular URLs
 
-app.use("/url", urlRoute);
-
-
-app.get("/:shortId", async (req, res) => {
+app.get('/:shortId', async (req, res) => {
   const shortId = req.params.shortId;
+  const URL = req.db.model('URL', new mongoose.Schema({
+    title: { type: String, required: true },
+    shortId: { type: String, required: true, unique: true },
+    redirectURL: { type: String, required: true },
+    visitHistory: [{ timestamp: { type: Date, default: Date.now } }],
+  }));
+
   const entry = await URL.findOneAndUpdate(
-    {
-      shortId,
-    },
-    {
-      $push: {
-        visitHistory: {
-          timestamp: Date.now(),
-        },
-      },
-    }
+    { shortId },
+    { $push: { visitHistory: { timestamp: Date.now() } } }
   );
-  if (entry) {
-    res.redirect(entry.redirectURL);
-  } else {
-    res.status(404).json({ error: "URL not found" });
+
+  if (!entry) {
+    return res.status(404).send('URL not found');
   }
+
+  res.redirect(entry.redirectURL);
 });
 
 app.listen(PORT, () => console.log(`Server Started at PORT:${PORT}`));
